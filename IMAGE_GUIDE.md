@@ -1,47 +1,60 @@
-# Menambahkan Gambar ke Sphere Drawings
+# Progressive Dot Art Generator
 
-## Cara Menambahkan Gambar
+## Konsep Utama
 
-1. **Letakkan gambar** di folder `assets/images/`
-2. **Format yang didukung**: PNG, JPG, JPEG, GIF, BMP
-3. **Nama file** akan menjadi nama gambar dalam program
+Program ini membaca gambar **Artboard1.png** dan menciptakan **dot art** dimana ribuan dots kecil muncul **satu per satu** membentuk gambar tersebut.
+
+## File yang Dibutuhkan
+
+**Letakkan gambar Anda:**
+```
+e:\! UGM\!! GAMAFORCE\ObjectMaker\assets\images\Artboard1.png
+```
+
+## Format Gambar yang Didukung
+
+✅ **PNG** (Paling direkomendasikan)
+✅ **JPG/JPEG** 
+✅ **GIF**
+✅ **BMP**
+
+## Tips Gambar Artboard1.png
+
+### ✅ **Gambar Ideal:**
+- **Background putih** atau transparan
+- **Kontras tinggi** (objek gelap, background terang)
+- **Bentuk yang jelas** dengan garis tegas
+- **Resolusi cukup** (300x300 hingga 800x800 pixel)
+
+### ❌ **Hindari:**
+- Gradasi atau blur yang berlebihan
+- Background dengan warna gelap
+- Detail terlalu halus atau rumit
+- Warna yang terlalu mirip antara objek dan background
 
 ## Struktur Folder
 ```
 ObjectMaker/
 ├── assets/
 │   └── images/
-│       ├── ball.png
-│       ├── star.jpg
-│       └── emoji.png
+│       └── Artboard1.png  ← Gambar utama Anda
 ├── sphere_drawings.py
 └── README.md
 ```
 
-## Kontrol Gambar Baru
+## Cara Kerja
 
-- **Right Click**: Tambah sphere dengan gambar di posisi kursor
-- **I**: Tambah sphere gambar random di posisi random
-- **Left Click**: Tetap menambah sphere warna biasa
+1. **Program scan** setiap 8 pixel dari gambar Artboard1.png
+2. **Deteksi warna** dan skip area putih/background
+3. **Generate koordinat** untuk setiap dot
+4. **Progressive creation** - dots muncul satu per satu
+5. **Membentuk gambar** sesuai pola asli
 
-## Tips Gambar
+## Hasil yang Diharapkan
 
-1. **Ukuran optimal**: 64x64 hingga 128x128 pixel
-2. **Background transparan**: Gunakan PNG dengan alpha channel untuk hasil terbaik
-3. **Kontras tinggi**: Gambar dengan kontras tinggi akan terlihat lebih jelas
-4. **Format ringan**: JPG untuk foto, PNG untuk grafis dengan transparansi
+- ✅ Ribuan dots kecil berwarna
+- ✅ Muncul satu per satu secara bertahap  
+- ✅ Membentuk gambar Artboard1.png dengan presisi
+- ✅ Efek seperti time-lapse pointillism painting
 
-## Contoh Gambar yang Bagus
-
-- Emoji atau emoticon
-- Icon sederhana
-- Logo atau simbol
-- Bentuk geometris
-- Karakter kartun sederhana
-
-## Troubleshooting
-
-- Jika gambar tidak muncul, cek apakah file ada di `assets/images/`
-- Pastikan format file didukung
-- Cek console untuk pesan error loading gambar
-- Gambar akan otomatis di-scale sesuai ukuran sphere
+**Siapkan gambar Artboard1.png Anda dan lihat magic happen! 🎨✨**

@@ -8,6 +8,8 @@ import math
 import random
 import sys
 import os
+import numpy as np
+from PIL import Image
 
 # Initialize Pygame
 pygame.init()
@@ -33,170 +35,243 @@ ORANGE = (255, 165, 0)
 
 COLORS = [RED, GREEN, BLUE, YELLOW, PURPLE, CYAN, ORANGE]
 
-class ImageManager:
-    """Manages loading and handling of images for spheres"""
+class ProgressiveDotCreator:
+    """Creates dots progressively from image pattern with appearing animation"""
     def __init__(self):
-        self.images = {}
-        self.load_images()
+        self.dot_queue = []
+        self.is_active = False
+        self.dots_per_frame = 1  # ONLY 1 sphere per frame for true one-by-one
+        self.frame_counter = 0
+        self.creation_delay = 3  # 3 frames between each sphere for visible separation
+        self.spawn_delay_counter = 0
+        
+    def load_pattern(self, image_path):
+        """Load image and create dot pattern data"""
+        try:
+            img = Image.open(image_path)
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Scale image to fit screen
+            img_width, img_height = img.size
+            scale = min(SCREEN_WIDTH/img_width, SCREEN_HEIGHT/img_height) * 0.7
+            new_width = int(img_width * scale)
+            new_height = int(img_height * scale)
+            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            
+            # Calculate offset to center
+            offset_x = (SCREEN_WIDTH - new_width) // 2
+            offset_y = (SCREEN_HEIGHT - new_height) // 2
+            
+            img_array = np.array(img)
+            self.dot_queue = []
+            
+            # Sample every 8 pixels for dot pattern
+            for y in range(0, new_height, 8):
+                for x in range(0, new_width, 8):
+                    r, g, b = img_array[y, x]
+                    
+                    # Skip white/light background
+                    if (r + g + b) / 3 > 240:
+                        continue
+                    
+                    screen_x = x + offset_x + random.randint(-2, 2)
+                    screen_y = y + offset_y + random.randint(-2, 2)
+                    
+                    # Ensure within bounds
+                    screen_x = max(10, min(SCREEN_WIDTH - 10, screen_x))
+                    screen_y = max(10, min(SCREEN_HEIGHT - 10, screen_y))
+                    
+                    dot_info = {
+                        'x': screen_x,
+                        'y': screen_y,
+                        'color': (r, g, b),
+                        'radius': random.randint(4, 8)
+                    }
+                    self.dot_queue.append(dot_info)
+            
+            # Shuffle for random creation order
+            random.shuffle(self.dot_queue)
+            print(f"🎯 Loaded {len(self.dot_queue)} dots for progressive creation")
+            return True
+            
+        except Exception as e:
+            print(f"Error loading pattern: {e}")
+            return False
     
-    def load_images(self):
-        """Load images from assets/images directory"""
-        assets_path = os.path.join(os.path.dirname(__file__), "assets", "images")
-        if os.path.exists(assets_path):
-            for filename in os.listdir(assets_path):
-                if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
-                    try:
-                        image_path = os.path.join(assets_path, filename)
-                        image = pygame.image.load(image_path).convert_alpha()
-                        name = os.path.splitext(filename)[0]
-                        self.images[name] = image
-                        print(f"Loaded image: {name}")
-                    except pygame.error as e:
-                        print(f"Could not load image {filename}: {e}")
+    def start_creation(self, speed=3):
+        """Start one-by-one sphere creation"""
+        self.is_active = True
+        self.creation_delay = max(1, 6 - speed)  # Speed 1=5 frames, 2=4 frames, 3=3 frames, etc.
+        self.dots_per_frame = 1  # Always only 1 sphere at a time
+        self.frame_counter = 0
+        self.spawn_delay_counter = 0
+        print(f"🎯 Starting ONE-BY-ONE sphere creation - delay {self.creation_delay} frames")
+        print("✨ Each sphere appears individually!")
     
-    def get_image(self, name):
-        """Get an image by name, return None if not found"""
-        return self.images.get(name)
+    def get_next_dots(self):
+        """Get next single dot to create - TRUE one by one"""
+        if not self.is_active or not self.dot_queue:
+            return []
+        
+        self.frame_counter += 1
+        if self.frame_counter >= self.creation_delay:
+            self.frame_counter = 0
+            
+            # Get ONLY ONE dot at a time
+            next_dots = []
+            if self.dot_queue:
+                dot_data = self.dot_queue.pop(0)
+                dot_data['spawn_delay'] = 0  # No delay, immediate appearance
+                next_dots.append(dot_data)
+            
+            # Check if finished
+            if not self.dot_queue:
+                self.is_active = False
+                print("✅ One-by-one sphere creation complete!")
+            
+            return next_dots
+        
+        return []
     
-    def get_scaled_image(self, name, size):
-        """Get a scaled version of an image"""
-        image = self.get_image(name)
-        if image:
-            return pygame.transform.scale(image, (size * 2, size * 2))
-        return None
+    def is_creating(self):
+        return self.is_active
     
-    def list_images(self):
-        """Return list of available image names"""
-        return list(self.images.keys())
+    def remaining_count(self):
+        return len(self.dot_queue)
 
 class Sphere:
-    def __init__(self, x, y, radius, color, velocity_x=0, velocity_y=0, image=None):
-        self.x = x
-        self.y = y
-        self.radius = radius
+    def __init__(self, x, y, radius, color, velocity_x=0, velocity_y=0):
+        self.target_x = x  # Final destination position
+        self.target_y = y
+        self.x = SCREEN_WIDTH // 2  # Start from center
+        self.y = SCREEN_HEIGHT // 2
+        self.target_radius = radius
+        self.radius = 0  # Start with 0 radius (invisible)
         self.color = color
-        self.velocity_x = velocity_x
-        self.velocity_y = velocity_y
+        self.velocity_x = 0  # Will be calculated to reach target
+        self.velocity_y = 0
         self.trail = []  # Store previous positions for trail effect
         self.max_trail_length = 50
-        self.image = image  # Optional image texture
-        self.scaled_image = None
-        if self.image:
-            self.scaled_image = pygame.transform.scale(self.image, (radius * 2, radius * 2))
+        self.is_growing = True
+        self.growth_speed = 1.5  # Faster growth for quick appearance
+        self.spawn_delay = 0  # Delay before starting to grow
+        self.is_moving_to_target = False
+        self.move_speed = 0.1  # Speed of movement to target position
         
     def update(self):
-        # Apply gravity
-        self.velocity_y += GRAVITY
+        # Handle sphere growth animation (appearing effect)
+        if self.is_growing and self.spawn_delay <= 0:
+            if self.radius < self.target_radius:
+                self.radius += self.growth_speed
+                if self.radius >= self.target_radius:
+                    self.radius = self.target_radius
+                    self.is_growing = False
+                    self.is_moving_to_target = True  # Start moving to target after growing
+        elif self.spawn_delay > 0:
+            self.spawn_delay -= 1
         
-        # Apply friction
-        self.velocity_x *= FRICTION
-        self.velocity_y *= FRICTION
+        # Move towards target position after growing
+        if self.is_moving_to_target and not self.is_growing:
+            dx = self.target_x - self.x
+            dy = self.target_y - self.y
+            distance = math.sqrt(dx*dx + dy*dy)
+            
+            if distance > 2:  # Still moving to target
+                # Calculate velocity towards target
+                self.velocity_x = dx * self.move_speed
+                self.velocity_y = dy * self.move_speed
+            else:
+                # Reached target, stop moving
+                self.x = self.target_x
+                self.y = self.target_y
+                self.velocity_x = 0
+                self.velocity_y = 0
+                self.is_moving_to_target = False
         
         # Update position
         self.x += self.velocity_x
         self.y += self.velocity_y
         
-        # Store position for trail
-        self.trail.append((int(self.x), int(self.y)))
-        if len(self.trail) > self.max_trail_length:
-            self.trail.pop(0)
-        
-        # Boundary collision detection
-        if self.x - self.radius <= 0 or self.x + self.radius >= SCREEN_WIDTH:
-            self.velocity_x = -self.velocity_x * BOUNCE_DAMPENING
-            if self.x - self.radius <= 0:
-                self.x = self.radius
-            else:
-                self.x = SCREEN_WIDTH - self.radius
-                
-        if self.y - self.radius <= 0 or self.y + self.radius >= SCREEN_HEIGHT:
-            self.velocity_y = -self.velocity_y * BOUNCE_DAMPENING
-            if self.y - self.radius <= 0:
-                self.y = self.radius
-            else:
-                self.y = SCREEN_HEIGHT - self.radius
+        # Store position for trail (only when visible)
+        if self.radius > 0:
+            self.trail.append((int(self.x), int(self.y)))
+            if len(self.trail) > self.max_trail_length:
+                self.trail.pop(0)
     
     def draw(self, screen):
+        # Only draw if sphere has some size
+        if self.radius <= 0:
+            return
+            
         # Draw trail
         for i, pos in enumerate(self.trail):
             alpha = i / len(self.trail)  # Fade effect
             trail_radius = max(1, int(self.radius * alpha * 0.5))
-            if self.image:
-                # For image spheres, draw colored circles for trail
-                trail_color = tuple(int(c * alpha) for c in self.color)
-                pygame.draw.circle(screen, trail_color, pos, trail_radius)
-            else:
-                trail_color = tuple(int(c * alpha) for c in self.color)
-                pygame.draw.circle(screen, trail_color, pos, trail_radius)
+            trail_color = tuple(int(c * alpha) for c in self.color)
+            pygame.draw.circle(screen, trail_color, pos, trail_radius)
         
-        # Draw main sphere
-        if self.image and self.scaled_image:
-            # Draw image sphere
-            image_rect = self.scaled_image.get_rect()
-            image_rect.center = (int(self.x), int(self.y))
-            screen.blit(self.scaled_image, image_rect)
-            # Optional: Add border around image
-            pygame.draw.circle(screen, WHITE, (int(self.x), int(self.y)), self.radius, 2)
-        else:
-            # Draw regular colored sphere
-            pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), self.radius)
-            pygame.draw.circle(screen, WHITE, (int(self.x), int(self.y)), self.radius, 2)
+        # Draw main sphere with growing effect
+        current_radius = int(self.radius)
+        if current_radius > 0:
+            # Add a subtle glow effect during growth
+            if self.is_growing:
+                # Outer glow
+                glow_radius = current_radius + 3
+                glow_color = tuple(min(255, c + 50) for c in self.color)
+                pygame.draw.circle(screen, glow_color, (int(self.x), int(self.y)), glow_radius, 2)
+            
+            # Main sphere
+            pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), current_radius)
+            pygame.draw.circle(screen, WHITE, (int(self.x), int(self.y)), current_radius, 2)
 
 class SphereDrawings:
     def __init__(self):
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("Sphere Drawings - Physics Art")
+        pygame.display.set_caption("Auto Sphere Art - Creating from center...")
         self.clock = pygame.time.Clock()
         self.spheres = []
         self.running = True
         self.drawing_mode = True  # When True, trails persist
-        self.image_manager = ImageManager()  # Load images
-        self.current_image_index = 0  # For cycling through images
+        self.dot_creator = ProgressiveDotCreator()  # Progressive dot creator
+        self.physics_enabled = False  # Start with physics OFF for clean pattern
         
-        # Print available images
-        available_images = self.image_manager.list_images()
-        if available_images:
-            print(f"Available images: {', '.join(available_images)}")
+        # Load Artboard1 pattern
+        artboard_path = os.path.join("assets", "images", "Artboard1.png")
+        if os.path.exists(artboard_path):
+            success = self.dot_creator.load_pattern(artboard_path)
+            if success:
+                print("✅ Artboard1.png loaded for auto creation!")
+                # AUTO START - No need to press G
+                self.start_progressive_creation(speed=3)
+            else:
+                print("❌ Failed to load Artboard1 pattern")
         else:
-            print("No images found in assets/images directory")
+            print("❌ Artboard1.png not found in assets/images/")
         
-        # Create initial spheres
-        self.create_initial_spheres()
-        
-    def create_initial_spheres(self):
-        """Create some initial spheres with random properties"""
-        for _ in range(5):
-            x = random.randint(50, SCREEN_WIDTH - 50)
-            y = random.randint(50, SCREEN_HEIGHT - 50)
-            radius = random.randint(10, 30)
-            color = random.choice(COLORS)
-            velocity_x = random.uniform(-10, 10)
-            velocity_y = random.uniform(-10, 10)
-            
-            sphere = Sphere(x, y, radius, color, velocity_x, velocity_y)
-            self.spheres.append(sphere)
+        print("🎯 Auto-creating spheres from center to form your image!")
     
-    def add_sphere(self, x, y, use_image=False):
+    def start_progressive_creation(self, speed=3):
+        """Start progressive dot creation"""
+        self.spheres.clear()
+        self.dot_creator.start_creation(speed)
+        self.physics_enabled = False
+        print(f"🎬 One-by-one sphere creation started - speed {speed}")
+        print("🎯 Watch each sphere appear individually!")
+    
+    def add_sphere(self, x, y):
         """Add a new sphere at the given position"""
         radius = random.randint(8, 25)
         color = random.choice(COLORS)
         velocity_x = random.uniform(-8, 8)
         velocity_y = random.uniform(-8, 8)
         
-        image = None
-        if use_image:
-            available_images = self.image_manager.list_images()
-            if available_images:
-                image_name = available_images[self.current_image_index % len(available_images)]
-                image = self.image_manager.get_scaled_image(image_name, radius)
-                self.current_image_index += 1
-        
-        sphere = Sphere(x, y, radius, color, velocity_x, velocity_y, image)
+        sphere = Sphere(x, y, radius, color, velocity_x, velocity_y)
         self.spheres.append(sphere)
         return sphere
     
     def handle_events(self):
-        """Handle pygame events"""
+        """Handle pygame events - minimal controls for auto mode"""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
@@ -204,32 +279,24 @@ class SphereDrawings:
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
                 elif event.key == pygame.K_SPACE:
-                    # Toggle drawing mode
-                    self.drawing_mode = not self.drawing_mode
-                elif event.key == pygame.K_c:
-                    # Clear screen and reset spheres
+                    # Restart the animation
                     self.spheres.clear()
-                    self.create_initial_spheres()
-                elif event.key == pygame.K_r:
-                    # Add random sphere
-                    x = random.randint(50, SCREEN_WIDTH - 50)
-                    y = random.randint(50, SCREEN_HEIGHT - 50)
-                    self.add_sphere(x, y)
-                elif event.key == pygame.K_i:
-                    # Add random image sphere
-                    x = random.randint(50, SCREEN_WIDTH - 50)
-                    y = random.randint(50, SCREEN_HEIGHT - 50)
-                    self.add_sphere(x, y, use_image=True)
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:  # Left click - regular sphere
-                    mouse_x, mouse_y = pygame.mouse.get_pos()
-                    self.add_sphere(mouse_x, mouse_y)
-                elif event.button == 3:  # Right click - image sphere
-                    mouse_x, mouse_y = pygame.mouse.get_pos()
-                    self.add_sphere(mouse_x, mouse_y, use_image=True)
+                    self.start_progressive_creation(speed=3)
+                    print("🔄 Restarting auto creation from center!")
     
     def update(self):
-        """Update all spheres"""
+        """Update all spheres and handle progressive dot creation"""
+        # Handle progressive dot creation
+        new_dots = self.dot_creator.get_next_dots()
+        for dot_data in new_dots:
+            sphere = Sphere(
+                dot_data['x'], dot_data['y'], dot_data['radius'], dot_data['color'], 0, 0
+            )
+            # Set spawn delay for staggered appearance
+            sphere.spawn_delay = dot_data.get('spawn_delay', 0)
+            self.spheres.append(sphere)
+        
+        # Update all spheres (including growth animation)
         for sphere in self.spheres:
             sphere.update()
     
@@ -249,15 +316,19 @@ class SphereDrawings:
             sphere.draw(self.screen)
         
         # Draw instructions
-        font = pygame.font.Font(None, 20)
+        font = pygame.font.Font(None, 16)
         instructions = [
-            "Left Click: Add Sphere",
-            "Right Click: Add Image Sphere",
-            "SPACE: Toggle Trail Mode", 
-            "R: Add Random Sphere",
-            "I: Add Random Image Sphere",
-            "C: Clear & Reset",
-            "ESC: Exit"
+            "� ONE-BY-ONE SPHERE CREATION:",
+            "G: Start Individual Sphere Creation",
+            "1: Slow (5 frames) | 2: Medium (3 frames) | 3: Fast (1 frame)",
+            "+/-: Adjust delay between spheres",
+            "",
+            "⚙️ CONTROLS:",
+            "P: Toggle Physics | SPACE: Toggle Trails",
+            "C: Clear | ESC: Exit",
+            "",
+            f"Status: {'Creating ONE BY ONE' if self.dot_creator.is_creating() else 'Ready'}",
+            f"Spheres: {len(self.spheres)} | Remaining: {self.dot_creator.remaining_count()}"
         ]
         
         for i, instruction in enumerate(instructions):

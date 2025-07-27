@@ -13,11 +13,24 @@ A physics-based artistic sphere animation project using Pygame. This application
 
 ## Controls
 
-- **Left Click**: Add a new sphere at cursor position
+- **Left Click**: Add sphere with **Artboard1.png** image at cursor position
+- **Right Click**: Add regular colored sphere at cursor position  
+- **Middle Click**: Add sphere with other available images
 - **SPACE**: Toggle between trail drawing modes
-- **R**: Add a random sphere at random location
+- **R**: Add a random colored sphere at random location
+- **I**: Add random **Artboard1** sphere at random location
+- **A**: Add **Artboard1** sphere at random position
 - **C**: Clear screen and reset with initial spheres
 - **ESC**: Exit the application
+
+## Primary Feature: Artboard1 Integration
+
+This application is optimized to use **Artboard1.png** as the primary image texture:
+
+- **Default behavior**: Left-click creates spheres with your Artboard1 image
+- **Auto-loading**: Artboard1.png is automatically detected and prioritized
+- **Physics integration**: Image spheres follow the same physics as colored spheres
+- **Artistic output**: Creates unique patterns using your custom artwork
 
 ## Image Support
 
