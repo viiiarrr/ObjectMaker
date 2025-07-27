@@ -1,0 +1,90 @@
+# Sphere Drawings
+
+A physics-based artistic sphere animation project using Pygame. This application creates beautiful visual patterns through simulated sphere physics with gravity, collisions, and trail effects.
+
+## Features
+
+- **Physics Simulation**: Realistic gravity, friction, and bounce mechanics
+- **Interactive Drawing**: Click to add spheres and watch them create artistic patterns
+- **Trail Effects**: Beautiful fading trails that follow sphere movement
+- **Multiple Drawing Modes**: Toggle between persistent and fading trail modes
+- **Colorful Spheres**: Random colors and sizes for varied visual appeal
+- **Real-time Controls**: Add, clear, and modify spheres during runtime
+
+## Controls
+
+- **Left Click**: Add a new sphere at cursor position
+- **SPACE**: Toggle between trail drawing modes
+- **R**: Add a random sphere at random location
+- **C**: Clear screen and reset with initial spheres
+- **ESC**: Exit the application
+
+## Installation
+
+1. Ensure you have Python 3.7+ installed
+2. Install the required dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+## Running the Application
+
+```bash
+python sphere_drawings.py
+```
+
+## How It Works
+
+The application creates a physics simulation where:
+
+1. **Spheres** have position, velocity, radius, and color properties
+2. **Gravity** pulls spheres downward continuously
+3. **Friction** gradually slows down sphere movement
+4. **Boundary Collision** causes spheres to bounce off screen edges
+5. **Trail System** records previous positions to create artistic paths
+6. **Interactive Elements** allow real-time sphere creation and manipulation
+
+## Drawing Modes
+
+- **Persistent Mode**: Trails fade slowly, creating layered artistic patterns
+- **Clear Mode**: Screen clears each frame, showing only current sphere positions
+
+## Customization
+
+You can modify various parameters in the code:
+
+- `GRAVITY`: Strength of gravitational pull
+- `FRICTION`: Air resistance factor
+- `BOUNCE_DAMPENING`: Energy loss on collision
+- `COLORS`: Available sphere colors
+- `FPS`: Animation frame rate
+- Trail length and opacity effects
+
+## Physics Concepts
+
+This project demonstrates several physics concepts:
+
+- **Kinematics**: Position and velocity updates
+- **Forces**: Gravity and friction implementation
+- **Collisions**: Elastic and inelastic boundary interactions
+- **Energy Conservation**: Momentum and energy transfer
+
+## Visual Art
+
+The combination of physics simulation and trail rendering creates unique artistic patterns that emerge from the interaction of multiple spheres. Each run produces different visual results based on:
+
+- Initial sphere positions and velocities
+- User interaction timing and placement
+- Random color and size variations
+- Physics parameter settings
+
+Enjoy creating beautiful sphere-based art through physics simulation!
+
+## Requirements
+
+- Python 3.7+
+- Pygame 2.0.0+
+
+## License
+
+This project is open source and available under the MIT License.
