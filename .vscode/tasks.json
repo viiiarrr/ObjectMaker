@@ -1,0 +1,16 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run Sphere Drawings",
+			"type": "shell",
+			"command": "E:/!!Python/Python312/python.exe",
+			"args": [
+				"sphere_drawings.py"
+			],
+			"group": "build",
+			"isBackground": false,
+			"problemMatcher": []
+		}
+	]
+}
