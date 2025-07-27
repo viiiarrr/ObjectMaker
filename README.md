@@ -19,6 +19,25 @@ A physics-based artistic sphere animation project using Pygame. This application
 - **C**: Clear screen and reset with initial spheres
 - **ESC**: Exit the application
 
+## Image Support
+
+The application now supports custom images for spheres:
+
+- **Right Click**: Add sphere with image texture at cursor position
+- **I Key**: Add random image sphere at random location
+- Place your images in `assets/images/` directory
+- Supported formats: PNG, JPG, JPEG, GIF, BMP
+- Images are automatically scaled to sphere size
+
+### Creating Sample Images
+
+Run the sample image creator first:
+```bash
+python create_sample_images.py
+```
+
+This creates test images (circle, star, diamond, smiley) in the `assets/images/` folder.
+
 ## Installation
 
 1. Ensure you have Python 3.7+ installed
@@ -37,7 +56,7 @@ python sphere_drawings.py
 
 The application creates a physics simulation where:
 
-1. **Spheres** have position, velocity, radius, and color properties
+1. **Spheres** have position, velocity, radius, and color properties (and optional image textures)
 2. **Gravity** pulls spheres downward continuously
 3. **Friction** gradually slows down sphere movement
 4. **Boundary Collision** causes spheres to bounce off screen edges

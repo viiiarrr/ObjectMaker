@@ -7,6 +7,7 @@ import pygame
 import math
 import random
 import sys
+import os
 
 # Initialize Pygame
 pygame.init()
@@ -32,8 +33,44 @@ ORANGE = (255, 165, 0)
 
 COLORS = [RED, GREEN, BLUE, YELLOW, PURPLE, CYAN, ORANGE]
 
+class ImageManager:
+    """Manages loading and handling of images for spheres"""
+    def __init__(self):
+        self.images = {}
+        self.load_images()
+    
+    def load_images(self):
+        """Load images from assets/images directory"""
+        assets_path = os.path.join(os.path.dirname(__file__), "assets", "images")
+        if os.path.exists(assets_path):
+            for filename in os.listdir(assets_path):
+                if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
+                    try:
+                        image_path = os.path.join(assets_path, filename)
+                        image = pygame.image.load(image_path).convert_alpha()
+                        name = os.path.splitext(filename)[0]
+                        self.images[name] = image
+                        print(f"Loaded image: {name}")
+                    except pygame.error as e:
+                        print(f"Could not load image {filename}: {e}")
+    
+    def get_image(self, name):
+        """Get an image by name, return None if not found"""
+        return self.images.get(name)
+    
+    def get_scaled_image(self, name, size):
+        """Get a scaled version of an image"""
+        image = self.get_image(name)
+        if image:
+            return pygame.transform.scale(image, (size * 2, size * 2))
+        return None
+    
+    def list_images(self):
+        """Return list of available image names"""
+        return list(self.images.keys())
+
 class Sphere:
-    def __init__(self, x, y, radius, color, velocity_x=0, velocity_y=0):
+    def __init__(self, x, y, radius, color, velocity_x=0, velocity_y=0, image=None):
         self.x = x
         self.y = y
         self.radius = radius
@@ -42,6 +79,10 @@ class Sphere:
         self.velocity_y = velocity_y
         self.trail = []  # Store previous positions for trail effect
         self.max_trail_length = 50
+        self.image = image  # Optional image texture
+        self.scaled_image = None
+        if self.image:
+            self.scaled_image = pygame.transform.scale(self.image, (radius * 2, radius * 2))
         
     def update(self):
         # Apply gravity
@@ -80,12 +121,26 @@ class Sphere:
         for i, pos in enumerate(self.trail):
             alpha = i / len(self.trail)  # Fade effect
             trail_radius = max(1, int(self.radius * alpha * 0.5))
-            trail_color = tuple(int(c * alpha) for c in self.color)
-            pygame.draw.circle(screen, trail_color, pos, trail_radius)
+            if self.image:
+                # For image spheres, draw colored circles for trail
+                trail_color = tuple(int(c * alpha) for c in self.color)
+                pygame.draw.circle(screen, trail_color, pos, trail_radius)
+            else:
+                trail_color = tuple(int(c * alpha) for c in self.color)
+                pygame.draw.circle(screen, trail_color, pos, trail_radius)
         
         # Draw main sphere
-        pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), self.radius)
-        pygame.draw.circle(screen, WHITE, (int(self.x), int(self.y)), self.radius, 2)
+        if self.image and self.scaled_image:
+            # Draw image sphere
+            image_rect = self.scaled_image.get_rect()
+            image_rect.center = (int(self.x), int(self.y))
+            screen.blit(self.scaled_image, image_rect)
+            # Optional: Add border around image
+            pygame.draw.circle(screen, WHITE, (int(self.x), int(self.y)), self.radius, 2)
+        else:
+            # Draw regular colored sphere
+            pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), self.radius)
+            pygame.draw.circle(screen, WHITE, (int(self.x), int(self.y)), self.radius, 2)
 
 class SphereDrawings:
     def __init__(self):
@@ -95,6 +150,15 @@ class SphereDrawings:
         self.spheres = []
         self.running = True
         self.drawing_mode = True  # When True, trails persist
+        self.image_manager = ImageManager()  # Load images
+        self.current_image_index = 0  # For cycling through images
+        
+        # Print available images
+        available_images = self.image_manager.list_images()
+        if available_images:
+            print(f"Available images: {', '.join(available_images)}")
+        else:
+            print("No images found in assets/images directory")
         
         # Create initial spheres
         self.create_initial_spheres()
@@ -112,15 +176,24 @@ class SphereDrawings:
             sphere = Sphere(x, y, radius, color, velocity_x, velocity_y)
             self.spheres.append(sphere)
     
-    def add_sphere(self, x, y):
+    def add_sphere(self, x, y, use_image=False):
         """Add a new sphere at the given position"""
         radius = random.randint(8, 25)
         color = random.choice(COLORS)
         velocity_x = random.uniform(-8, 8)
         velocity_y = random.uniform(-8, 8)
         
-        sphere = Sphere(x, y, radius, color, velocity_x, velocity_y)
+        image = None
+        if use_image:
+            available_images = self.image_manager.list_images()
+            if available_images:
+                image_name = available_images[self.current_image_index % len(available_images)]
+                image = self.image_manager.get_scaled_image(image_name, radius)
+                self.current_image_index += 1
+        
+        sphere = Sphere(x, y, radius, color, velocity_x, velocity_y, image)
         self.spheres.append(sphere)
+        return sphere
     
     def handle_events(self):
         """Handle pygame events"""
@@ -142,10 +215,18 @@ class SphereDrawings:
                     x = random.randint(50, SCREEN_WIDTH - 50)
                     y = random.randint(50, SCREEN_HEIGHT - 50)
                     self.add_sphere(x, y)
+                elif event.key == pygame.K_i:
+                    # Add random image sphere
+                    x = random.randint(50, SCREEN_WIDTH - 50)
+                    y = random.randint(50, SCREEN_HEIGHT - 50)
+                    self.add_sphere(x, y, use_image=True)
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:  # Left click
+                if event.button == 1:  # Left click - regular sphere
                     mouse_x, mouse_y = pygame.mouse.get_pos()
                     self.add_sphere(mouse_x, mouse_y)
+                elif event.button == 3:  # Right click - image sphere
+                    mouse_x, mouse_y = pygame.mouse.get_pos()
+                    self.add_sphere(mouse_x, mouse_y, use_image=True)
     
     def update(self):
         """Update all spheres"""
@@ -168,11 +249,13 @@ class SphereDrawings:
             sphere.draw(self.screen)
         
         # Draw instructions
-        font = pygame.font.Font(None, 24)
+        font = pygame.font.Font(None, 20)
         instructions = [
             "Left Click: Add Sphere",
-            "SPACE: Toggle Trail Mode",
+            "Right Click: Add Image Sphere",
+            "SPACE: Toggle Trail Mode", 
             "R: Add Random Sphere",
+            "I: Add Random Image Sphere",
             "C: Clear & Reset",
             "ESC: Exit"
         ]
