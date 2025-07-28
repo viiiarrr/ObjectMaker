@@ -11,14 +11,27 @@ import os
 import numpy as np
 from PIL import Image
 
+# ==================== IMAGE CONFIGURATION ====================
+# Change this to use different images from assets/images/
+# Available images: Artboard1.png, cyan_diamond.png, red_circle.png, smiley.png, yellow_star.png, Logo_Evos.png
+IMAGE_NAME = "RRQLAMA.png"  # Change this to your desired image
+# ============================================================
+
 # Initialize Pygame
 pygame.init()
 
-# Get full screen dimensions
-info = pygame.display.Info()
-SCREEN_WIDTH = info.current_w
-SCREEN_HEIGHT = info.current_h
+# Set reasonable window dimensions  
+SCREEN_WIDTH = 1200
+SCREEN_HEIGHT = 800
 FPS = 60
+
+# Sphere configuration constants - Optimized for detailed logo reproduction
+SPHERE_SPACING = 8   # Much finer sampling for precise detail capture
+MIN_SPHERE_RADIUS = 4   # Smaller minimum for ultra-fine details
+MAX_SPHERE_RADIUS = 12  # Smaller maximum for consistent detail level
+SPHERE_GROWTH_SPEED = 2.0  # Moderate growth for smooth animation
+SPHERE_MOVE_SPEED = 0.12   # Faster movement for quicker formation
+CREATION_DELAY = 1  # Very fast creation - 1 frame delay for maximum density
 
 # Colors
 BLACK = (0, 0, 0)
@@ -36,10 +49,10 @@ class Sphere:
         self.velocity_x = 0  # Will be calculated to reach target
         self.velocity_y = 0
         self.is_growing = True
-        self.growth_speed = 2.5  # Faster growth for larger spheres
+        self.growth_speed = SPHERE_GROWTH_SPEED  # Use configurable constant
         self.spawn_delay = 0  # Delay before starting to grow
         self.is_moving_to_target = False
-        self.move_speed = 0.06  # Slightly slower movement for larger spheres
+        self.move_speed = SPHERE_MOVE_SPEED  # Use configurable constant
         
     def update(self):
         # Handle sphere growth animation (appearing effect)
@@ -100,18 +113,18 @@ class AutoSphereCreator:
         self.dot_queue = []
         self.is_active = False
         self.frame_counter = 0
-        self.creation_delay = 4  # frames between each sphere creation
+        self.creation_delay = CREATION_DELAY  # Use configurable constant
         
     def load_pattern(self, image_path):
-        """Load image and create dot pattern data"""
+        """Load image and create dot pattern data with enhanced detail detection"""
         try:
             img = Image.open(image_path)
             if img.mode != 'RGB':
                 img = img.convert('RGB')
             
-            # Scale image to fit screen
+            # Scale image to fit screen with higher resolution preservation
             img_width, img_height = img.size
-            scale = min(SCREEN_WIDTH/img_width, SCREEN_HEIGHT/img_height) * 0.7
+            scale = min(SCREEN_WIDTH/img_width, SCREEN_HEIGHT/img_height) * 0.85
             new_width = int(img_width * scale)
             new_height = int(img_height * scale)
             img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
@@ -123,40 +136,74 @@ class AutoSphereCreator:
             img_array = np.array(img)
             self.dot_queue = []
             
-            # Sample with larger spacing for bigger spheres
-            sphere_spacing = 18  # Increased spacing for larger spheres
-            for y in range(0, new_height, sphere_spacing):
-                for x in range(0, new_width, sphere_spacing):
+            # Enhanced sampling with adaptive sphere sizing based on local contrast
+            for y in range(0, new_height, SPHERE_SPACING):
+                for x in range(0, new_width, SPHERE_SPACING):
+                    if y >= img_array.shape[0] or x >= img_array.shape[1]:
+                        continue
+                        
                     r, g, b = img_array[y, x]
-                    
-                    # Convert to int to avoid overflow warnings
                     r, g, b = int(r), int(g), int(b)
                     
-                    # Skip white/light background
-                    if (r + g + b) / 3 > 240:
+                    # More nuanced background detection for better detail capture
+                    brightness = (r + g + b) / 3
+                    if brightness > 250:  # Very bright pixels only
                         continue
                     
-                    screen_x = x + offset_x + random.randint(-3, 3)
-                    screen_y = y + offset_y + random.randint(-3, 3)
+                    # Calculate local contrast for adaptive sphere sizing
+                    local_contrast = self._calculate_local_contrast(img_array, x, y)
                     
-                    # Ensure within bounds with more padding for larger spheres
-                    screen_x = max(25, min(SCREEN_WIDTH - 25, screen_x))
-                    screen_y = max(25, min(SCREEN_HEIGHT - 25, screen_y))
+                    # Adaptive radius based on local image characteristics
+                    if brightness < 50:  # Dark areas - smaller spheres for detail
+                        radius = random.randint(MIN_SPHERE_RADIUS, MIN_SPHERE_RADIUS + 3)
+                    elif local_contrast > 50:  # High contrast areas - medium spheres
+                        radius = random.randint(MIN_SPHERE_RADIUS + 2, MAX_SPHERE_RADIUS - 2)
+                    else:  # Uniform areas - larger spheres for efficiency
+                        radius = random.randint(MAX_SPHERE_RADIUS - 3, MAX_SPHERE_RADIUS)
+                    
+                    screen_x = x + offset_x + random.randint(-1, 1)
+                    screen_y = y + offset_y + random.randint(-1, 1)
+                    
+                    # Ensure within bounds with proper padding
+                    screen_x = max(radius + 2, min(SCREEN_WIDTH - radius - 2, screen_x))
+                    screen_y = max(radius + 2, min(SCREEN_HEIGHT - radius - 2, screen_y))
                     
                     dot_info = {
                         'x': screen_x,
                         'y': screen_y,
                         'color': (r, g, b),
-                        'radius': random.randint(15, 25)  # Much larger spheres
+                        'radius': radius
                     }
                     self.dot_queue.append(dot_info)
             
-            # Shuffle for random creation order
-            random.shuffle(self.dot_queue)
+            # Sort by distance from center for natural growth pattern
+            center_x, center_y = SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2
+            self.dot_queue.sort(key=lambda dot: 
+                math.sqrt((dot['x'] - center_x)**2 + (dot['y'] - center_y)**2))
+            
             return True
             
         except Exception as e:
+            print(f"Error loading pattern: {e}")
             return False
+    
+    def _calculate_local_contrast(self, img_array, x, y):
+        """Calculate local contrast around a pixel for adaptive sphere sizing"""
+        try:
+            # Sample 3x3 neighborhood for contrast calculation
+            min_val, max_val = 255, 0
+            for dy in range(-1, 2):
+                for dx in range(-1, 2):
+                    ny, nx = y + dy, x + dx
+                    if (0 <= ny < img_array.shape[0] and 
+                        0 <= nx < img_array.shape[1]):
+                        pixel_brightness = sum(img_array[ny, nx]) / 3
+                        min_val = min(min_val, pixel_brightness)
+                        max_val = max(max_val, pixel_brightness)
+            
+            return max_val - min_val
+        except:
+            return 30  # Default moderate contrast
     
     def start_creation(self):
         """Start automatic sphere creation"""
@@ -193,23 +240,25 @@ class AutoSphereCreator:
 class AutoSphereArt:
     def __init__(self):
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("Auto Sphere Art - Creating from center...")
+        pygame.display.set_caption(f"Auto Sphere Art - {IMAGE_NAME}")
         self.clock = pygame.time.Clock()
         self.spheres = []
         self.running = True
         self.sphere_creator = AutoSphereCreator()
         
-        # Load Artboard1 pattern and AUTO START
-        artboard_path = os.path.join("assets", "images", "Artboard1.png")
-        if os.path.exists(artboard_path):
-            success = self.sphere_creator.load_pattern(artboard_path)
+        # Load image from configuration and AUTO START
+        image_path = os.path.join("assets", "images", IMAGE_NAME)
+        if os.path.exists(image_path):
+            success = self.sphere_creator.load_pattern(image_path)
             if success:
                 # AUTO START - No need to press anything
                 self.sphere_creator.start_creation()
+                print(f"✅ Loaded {IMAGE_NAME} successfully!")
             else:
-                print("❌ Failed to load Artboard1 pattern")
+                print(f"❌ Failed to load {IMAGE_NAME}")
         else:
-            print("❌ Artboard1.png not found in assets/images/")
+            print(f"❌ {IMAGE_NAME} not found in assets/images/")
+            print("Available images:", os.listdir("assets/images"))
         
         print("🎯 Auto-creating spheres from center to form your image!")
     
@@ -222,12 +271,13 @@ class AutoSphereArt:
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
                 elif event.key == pygame.K_SPACE:
-                    # Restart the animation
+                    # Restart the animation with configured image
                     self.spheres.clear()
-                    if os.path.exists(os.path.join("assets", "images", "Artboard1.png")):
-                        self.sphere_creator.load_pattern(os.path.join("assets", "images", "Artboard1.png"))
+                    image_path = os.path.join("assets", "images", IMAGE_NAME)
+                    if os.path.exists(image_path):
+                        self.sphere_creator.load_pattern(image_path)
                         self.sphere_creator.start_creation()
-                    print("🔄 Restarting auto creation from center!")
+                        print(f"🔄 Restarting auto creation with {IMAGE_NAME}!")
     
     def update(self):
         """Update all spheres and handle automatic sphere creation"""
