@@ -14,7 +14,7 @@ from PIL import Image
 # ==================== IMAGE CONFIGURATION ====================
 # Change this to use different images from assets/images/
 # Available images: Artboard1.png, cyan_diamond.png, red_circle.png, smiley.png, yellow_star.png, Logo_Evos.png
-IMAGE_NAME = "RRQLAMA.png"  # Change this to your desired image
+IMAGE_NAME = "rrq.png"  # Change this to your desired image
 # ============================================================
 
 # Initialize Pygame
