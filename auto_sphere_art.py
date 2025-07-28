@@ -14,9 +14,10 @@ from PIL import Image
 # Initialize Pygame
 pygame.init()
 
-# Constants
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
+# Get full screen dimensions
+info = pygame.display.Info()
+SCREEN_WIDTH = info.current_w
+SCREEN_HEIGHT = info.current_h
 FPS = 60
 
 # Colors
@@ -35,10 +36,10 @@ class Sphere:
         self.velocity_x = 0  # Will be calculated to reach target
         self.velocity_y = 0
         self.is_growing = True
-        self.growth_speed = 1.8  # Fast growth for quick appearance
+        self.growth_speed = 2.5  # Faster growth for larger spheres
         self.spawn_delay = 0  # Delay before starting to grow
         self.is_moving_to_target = False
-        self.move_speed = 0.08  # Speed of movement to target position
+        self.move_speed = 0.06  # Slightly slower movement for larger spheres
         
     def update(self):
         # Handle sphere growth animation (appearing effect)
@@ -84,9 +85,9 @@ class Sphere:
         if current_radius > 0:
             # Add a subtle glow effect during growth
             if self.is_growing:
-                # Outer glow
+                # Outer glow - ensure color values don't exceed 255
                 glow_radius = current_radius + 3
-                glow_color = tuple(min(255, c + 50) for c in self.color)
+                glow_color = tuple(min(255, int(c) + 50) for c in self.color)
                 pygame.draw.circle(screen, glow_color, (int(self.x), int(self.y)), glow_radius, 2)
             
             # Main sphere
@@ -122,45 +123,45 @@ class AutoSphereCreator:
             img_array = np.array(img)
             self.dot_queue = []
             
-            # Sample every 6 pixels for dense dot pattern
-            for y in range(0, new_height, 6):
-                for x in range(0, new_width, 6):
+            # Sample with larger spacing for bigger spheres
+            sphere_spacing = 18  # Increased spacing for larger spheres
+            for y in range(0, new_height, sphere_spacing):
+                for x in range(0, new_width, sphere_spacing):
                     r, g, b = img_array[y, x]
+                    
+                    # Convert to int to avoid overflow warnings
+                    r, g, b = int(r), int(g), int(b)
                     
                     # Skip white/light background
                     if (r + g + b) / 3 > 240:
                         continue
                     
-                    screen_x = x + offset_x + random.randint(-2, 2)
-                    screen_y = y + offset_y + random.randint(-2, 2)
+                    screen_x = x + offset_x + random.randint(-3, 3)
+                    screen_y = y + offset_y + random.randint(-3, 3)
                     
-                    # Ensure within bounds
-                    screen_x = max(10, min(SCREEN_WIDTH - 10, screen_x))
-                    screen_y = max(10, min(SCREEN_HEIGHT - 10, screen_y))
+                    # Ensure within bounds with more padding for larger spheres
+                    screen_x = max(25, min(SCREEN_WIDTH - 25, screen_x))
+                    screen_y = max(25, min(SCREEN_HEIGHT - 25, screen_y))
                     
                     dot_info = {
                         'x': screen_x,
                         'y': screen_y,
                         'color': (r, g, b),
-                        'radius': random.randint(3, 7)
+                        'radius': random.randint(15, 25)  # Much larger spheres
                     }
                     self.dot_queue.append(dot_info)
             
             # Shuffle for random creation order
             random.shuffle(self.dot_queue)
-            print(f"🎯 Loaded {len(self.dot_queue)} spheres for auto creation")
             return True
             
         except Exception as e:
-            print(f"Error loading pattern: {e}")
             return False
     
     def start_creation(self):
         """Start automatic sphere creation"""
         self.is_active = True
         self.frame_counter = 0
-        print("🎬 Starting automatic sphere creation from center!")
-        print("✨ Watch spheres appear one by one and move to form your image!")
     
     def get_next_sphere(self):
         """Get next sphere to create - ONE by ONE"""
@@ -178,7 +179,6 @@ class AutoSphereCreator:
                 # Check if finished
                 if not self.dot_queue:
                     self.is_active = False
-                    print("✅ Auto sphere creation complete!")
                 
                 return sphere_data
         
@@ -204,7 +204,6 @@ class AutoSphereArt:
         if os.path.exists(artboard_path):
             success = self.sphere_creator.load_pattern(artboard_path)
             if success:
-                print("✅ Artboard1.png loaded!")
                 # AUTO START - No need to press anything
                 self.sphere_creator.start_creation()
             else:
@@ -256,26 +255,7 @@ class AutoSphereArt:
         for sphere in self.spheres:
             sphere.draw(self.screen)
         
-        # Draw minimal status info
-        font = pygame.font.Font(None, 24)
-        status_text = "Auto Creating Spheres..." if self.sphere_creator.is_creating() else "Creation Complete!"
-        text = font.render(status_text, True, WHITE)
-        self.screen.blit(text, (10, 10))
-        
-        count_text = f"Spheres: {len(self.spheres)} | Remaining: {self.sphere_creator.remaining_count()}"
-        count_surface = font.render(count_text, True, WHITE)
-        self.screen.blit(count_surface, (10, 40))
-        
-        # Instructions
-        instruction_font = pygame.font.Font(None, 16)
-        instructions = [
-            "ESC: Exit | SPACE: Restart"
-        ]
-        
-        for i, instruction in enumerate(instructions):
-            text = instruction_font.render(instruction, True, WHITE)
-            self.screen.blit(text, (10, SCREEN_HEIGHT - 30 + i * 20))
-        
+        # No text displays - full screen art only
         pygame.display.flip()
     
     def run(self):
